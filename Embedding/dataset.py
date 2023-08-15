@@ -67,7 +67,7 @@ class CosentTrainDataset(Dataset):
 
     def __getitem__(self, index: int):
         line = self.data[index]
-        return self.text_2_id(line[0]), np.array(line[1], dtype=np.float32)
+        return self.text_2_id(line[0]), line[1]
 
 
 def load_text_matching_test_data(dataset_dir):

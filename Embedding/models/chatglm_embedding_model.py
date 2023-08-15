@@ -75,7 +75,7 @@ def apply_rotary_pos_emb(x: torch.Tensor, rope_cache: torch.Tensor) -> torch.Ten
     # truncate to support variable sizes
     rope_cache = rope_cache[:sq]
     xshaped = x.reshape(sq, -1, np, rot_dim // 2, 2)
-    rope_cache = rope_cache.view(sq, -1, 1, xshaped.size(3), 2)
+    rope_cache = rope_cache.contiguous().view(sq, -1, 1, xshaped.size(3), 2)
     x_out2 = torch.stack(
         [
             xshaped[..., 0] * rope_cache[..., 0] - xshaped[..., 1] * rope_cache[..., 1],
@@ -177,9 +177,9 @@ class CoreAttention(nn.Module):
             output_size = (query_layer.size(1), query_layer.size(2), query_layer.size(0), key_layer.size(0))
 
             # [sq, b, np, hn] -> [sq, b * np, hn]
-            query_layer = query_layer.view(output_size[2], output_size[0] * output_size[1], -1)
+            query_layer = query_layer.contiguous().view(output_size[2], output_size[0] * output_size[1], -1)
             # [sk, b, np, hn] -> [sk, b * np, hn]
-            key_layer = key_layer.view(output_size[3], output_size[0] * output_size[1], -1)
+            key_layer = key_layer.contiguous().view(output_size[3], output_size[0] * output_size[1], -1)
 
             # preallocting input tensor: [b * np, sq, sk]
             matmul_input_buffer = torch.empty(
@@ -197,7 +197,7 @@ class CoreAttention(nn.Module):
             )
 
             # change view to [b, np, sq, sk]
-            attention_scores = matmul_result.view(*output_size)
+            attention_scores = matmul_result.contiguous().view(*output_size)
 
             # ===========================
             # Attention probs and dropout
@@ -231,18 +231,18 @@ class CoreAttention(nn.Module):
             # context layer shape: [b, np, sq, hn]
             output_size = (value_layer.size(1), value_layer.size(2), query_layer.size(0), value_layer.size(3))
             # change view [sk, b * np, hn]
-            value_layer = value_layer.view(value_layer.size(0), output_size[0] * output_size[1], -1)
+            value_layer = value_layer.contiguous().view(value_layer.size(0), output_size[0] * output_size[1], -1)
             # change view [b * np, sq, sk]
-            attention_probs = attention_probs.view(output_size[0] * output_size[1], output_size[2], -1)
+            attention_probs = attention_probs.contiguous().view(output_size[0] * output_size[1], output_size[2], -1)
             # matmul: [b * np, sq, hn]
             context_layer = torch.bmm(attention_probs, value_layer.transpose(0, 1))
             # change view [b, np, sq, hn]
-            context_layer = context_layer.view(*output_size)
+            context_layer = context_layer.contiguous().view(*output_size)
             # [b, np, sq, hn] --> [sq, b, np, hn]
             context_layer = context_layer.permute(2, 0, 1, 3).contiguous()
             # [sq, b, np, hn] --> [sq, b, hp]
             new_context_layer_shape = context_layer.size()[:-2] + (self.hidden_size_per_partition,)
-            context_layer = context_layer.view(*new_context_layer_shape)
+            context_layer = context_layer.contiguous().view(*new_context_layer_shape)
 
         return context_layer
 
@@ -321,13 +321,13 @@ class SelfAttention(nn.Module):
                 ],
                 dim=-1,
             )
-            query_layer = query_layer.view(
+            query_layer = query_layer.contiguous().view(
                 query_layer.size()[:-1] + (self.num_attention_heads_per_partition, self.hidden_size_per_attention_head)
             )
-            key_layer = key_layer.view(
+            key_layer = key_layer.contiguous().view(
                 key_layer.size()[:-1] + (self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head)
             )
-            value_layer = value_layer.view(
+            value_layer = value_layer.contiguous().view(
                 value_layer.size()[:-1]
                 + (self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head)
             )
@@ -335,7 +335,7 @@ class SelfAttention(nn.Module):
             new_tensor_shape = mixed_x_layer.size()[:-1] + \
                                (self.num_attention_heads_per_partition,
                                 3 * self.hidden_size_per_attention_head)
-            mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
+            mixed_x_layer = mixed_x_layer.contiguous().view(*new_tensor_shape)
 
             # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
             (query_layer, key_layer, value_layer) = split_tensor_along_last_dim(mixed_x_layer, 3)

@@ -103,8 +103,6 @@ class Trainer:
 
         batch_start = time.time()
         for step, (inputs, labels) in enumerate(self.train_loader):
-            logger.info(f"inputs: {inputs['input_ids'].shape}")
-            logger.info(f"labels: {labels.shape} {labels}")
             self.global_step += 1
             lr = self.optimizer.param_groups[0]['lr']
 
@@ -116,9 +114,7 @@ class Trainer:
             cur_batch_size = labels.size()[0]
 
             output_embeddings = self.model.get_embeddings(inputs)
-            logger.info(f"output_embeddings: {output_embeddings.shape}")
             loss = self.calc_loss(labels, output_embeddings)
-            logger.info(f"loss: {loss}")
 
             current_loss = loss.item()
 
