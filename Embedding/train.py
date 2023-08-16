@@ -54,6 +54,7 @@ class Trainer:
         os.makedirs(self.output_dir, exist_ok=True)
 
         self.global_step = 0
+        self.current_epoch = 0
         self.start_epoch = 0
         self.num_epochs = self.configs['num_epochs']
 
@@ -94,15 +95,18 @@ class Trainer:
         """
         Full training logic
         """
-        logger.info('start train')
+        training_start = time.time()
         for epoch in range(self.start_epoch, self.num_epochs):
-            self.epoch_result = self._train_epoch(epoch)
-            self._on_epoch_finish()
-        self._on_train_finish()
+            self.current_epoch = epoch
+            start = time.time()
+            self._train_epoch()
+            epoch_cost = time.time() - start
+            self._on_epoch_finish(epoch_cost)
 
-    def _train_epoch(self, epoch):
+        self._on_train_finish(time.time() - training_start)
+
+    def _train_epoch(self):
         self.model.train()
-        epoch_start = time.time()
 
         batch_start = time.time()
         for step, (inputs, labels) in enumerate(self.train_loader):
@@ -130,14 +134,15 @@ class Trainer:
 
             if self.global_step % self.configs['logging_steps'] == 0:
                 logger.info(
-                    f"[epoch:{epoch}/{self.num_epochs}] [step:{self.global_step}/{self.total_steps}] loss:{current_loss:.6f} lr:{lr:.9f} batch_cost:{batch_cost:.2f}s, speed:{cur_batch_size / batch_cost:.1f}/s")
+                    f"[epoch:{self.current_epoch}/{self.num_epochs}] [step:{self.global_step}/{self.total_steps}] loss:{current_loss:.6f} lr:{lr:.9f} batch_cost:{batch_cost:.2f}s, speed:{cur_batch_size / batch_cost:.1f}/s")
 
             if self.global_step % self.configs['save_steps'] == 0:
-                self._save_checkpoint(epoch, self.global_step)
+                self._save_checkpoint()
+
+            if self.global_step % self.configs['eval_steps'] == 0:
+                self.do_eval()
 
             batch_start = time.time()
-
-        return {'epoch_cost': time.time() - epoch_start, 'epoch': epoch}
 
     def evaluate(self):
         """
@@ -145,6 +150,7 @@ class Trainer:
 
         Utility function to be used by the eval_model() method. Not intended to be used directly.
         """
+        logger.info(f"****** start eval ******")
         start = time.time()
         results = {}
 
@@ -173,33 +179,32 @@ class Trainer:
 
         spearman = compute_spearmanr(batch_labels, batch_preds)
         pearson = compute_pearsonr(batch_labels, batch_preds)
-        logger.info(f"labels: {batch_labels[:10]}")
-        logger.info(f"preds:  {batch_preds[:10]}")
-        logger.info(f"pearson: {pearson}, spearman: {spearman}")
 
         results["eval_spearman"] = spearman
         results["eval_pearson"] = pearson
 
-        return results, time.time() - start
+        logger.info(f"****** eval finished! time_cost: {time.time() - start} results: {results}******")
+        return results
 
-    def _on_epoch_finish(self):
-        logger.info(f"epoch:{self.epoch_result['epoch']} finished. epoch_cost:{self.epoch_result['epoch_cost']:.2f}s\n")
-
-        metrics, eval_cost = self.evaluate()
+    def do_eval(self):
+        metrics = self.evaluate()
 
         if metrics['eval_spearman'] > self.metrics['eval_spearman']:
             self.metrics.update(metrics)
-            self.metrics['best_model_epoch'] = self.epoch_result['epoch']
+            self.metrics['best_model_epoch'] = self.current_epoch
             self.metrics['best_model_step'] = self.global_step
 
-            self._save_checkpoint(self.epoch_result['epoch'], self.global_step, best=True)
-            logger.info(f"Saving best model. best model: {self.metrics}\n")
+            self._save_checkpoint(best=True)
+            logger.info(f" Saving best model. best model: {self.metrics}\n")
         else:
-            self._save_checkpoint(self.epoch_result['epoch'], self.global_step)
-            logger.info(f"Saving best model")
+            self._save_checkpoint()
 
-    def _on_train_finish(self):
-        logger.info('train finished!!!')
+    def _on_epoch_finish(self, epoch_cost):
+        logger.info(f" epoch:{self.current_epoch} finished. epoch_cost:{epoch_cost:.2f}s\n")
+        self.do_eval()
+
+    def _on_train_finish(self, training_cost):
+        logger.info(f'****** train finished!!! training_cost: {training_cost} ******')
 
     def _sorted_checkpoints(self, checkpoint_prefix='epoch'):
         ordering_and_checkpoint_path = []
@@ -222,22 +227,23 @@ class Trainer:
         checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
         for checkpoint in checkpoints_to_be_deleted:
             logger.info(
-                f"Deleting older checkpoint [{checkpoint}] due to save_total_limit:{self.configs['save_total_limit']}")
+                f" Deleting older checkpoint [{checkpoint}] due to save_total_limit:{self.configs['save_total_limit']}")
             shutil.rmtree(checkpoint, ignore_errors=True)
 
         return
 
-    def _save_checkpoint(self, epoch, step, best=False):
+    def _save_checkpoint(self, best=False):
         if best:
             save_dir = os.path.join(self.output_dir, "best")
         else:
-            save_dir = os.path.join(self.output_dir, f"epoch-{epoch}-step-{step}")
+            save_dir = os.path.join(self.output_dir, f"epoch-{self.current_epoch}-step-{self.global_step}")
             self._rotate_checkpoints()
 
+        logger.info(f" saving model epoch:{self.current_epoch} step:{self.global_step}")
         os.makedirs(save_dir, exist_ok=True)
         self.model.save_adapter_model(save_dir)
         state = {
-            'epoch': epoch,
+            'epoch': self.current_epoch,
             'global_step': self.global_step,
             'configs': self.configs,
             'metrics': self.metrics
@@ -253,7 +259,7 @@ class Trainer:
         Resume from saved checkpoints
         :param checkpoint_path: Checkpoint path to be resumed
         """
-        logger.info("Loading checkpoint: {} ...".format(checkpoint_dir))
+        logger.info(f" Loading checkpoint: {checkpoint_dir} ......")
 
         self.model.load_adapter_model(checkpoint_dir)
 
@@ -274,7 +280,7 @@ class Trainer:
                 if isinstance(v, torch.Tensor):
                     state[k] = v.to(self.device)
 
-        logger.info("resume from checkpoint (epoch {})".format(self.start_epoch))
+        logger.info(f" resume from checkpoint (epoch {self.start_epoch})")
 
         if self.start_epoch >= self.num_epochs:
             self.num_epochs = self.start_epoch + 5
@@ -284,6 +290,7 @@ class Trainer:
         self.model = build_model(**self.configs)
 
         t = time.time()
+        logger.info(f"****** Dataset Information ******")
         train_dataset = CosentTrainDataset(self.model.tokenizer,
                                            load_cosent_train_data(self.configs['dataset_dir']),
                                            self.configs['max_seq_len'])
@@ -301,13 +308,10 @@ class Trainer:
         self.eval_loader = DataLoader(eval_dataset, batch_size=1, shuffle=False, drop_last=False)
         self.eval_loader_len = len(self.eval_loader)
 
-        dataset_msg = '\n---------------Dataset Information---------------\n'
-        dataset_msg += 'train data total:{}'.format(self.train_data_total)
-        dataset_msg += '\neval data total:{}'.format(self.eval_data_total)
-        dataset_msg += '\ntime_cost:{:.2f}s'.format(time.time() - t)
-        dataset_msg += '\ndataset load success'
-        dataset_msg += '\n---------------Dataset Information---------------\n'
-        logger.info(dataset_msg)
+        logger.info(f" train data total:{self.train_data_total}")
+        logger.info(f" eval data total:{self.eval_data_total}")
+        logger.info(f" time cost: {time.time() - t}")
+        logger.info(f"****** Dataset Information ******")
 
         self.optimizer = AdamW(params=self.model.embedding_layer.parameters(), lr=self.configs.get('lr'),
                                correct_bias=False)
@@ -325,7 +329,7 @@ class Trainer:
             self._load_checkpoint(self.configs["resume_checkpoint"])
 
         logger.info("***** Running training *****")
-        logger.info(f"  Num examples = {len(train_dataset)}")
+        logger.info(f"  Num examples = {self.train_loader_len}")
         logger.info(f"  Batch size = {self.configs['batch_size']}")
         logger.info(f"  Num steps = {self.total_steps}")
         logger.info(f"  Warmup-steps: {warmup_steps}")

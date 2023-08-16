@@ -5,7 +5,8 @@ batch_size=8
 num_epochs=2
 max_seq_len=512
 lr=2e-5
-logging_steps=100
+logging_steps=200
+eval_steps=1000
 save_steps=2000
 save_total_limit=2
 output_dir="./output"
@@ -23,6 +24,7 @@ CUDA_VISIBLE_DEVICES=0 nohup python train.py \
   --warmup_ratio 0.05 \
   --logging_steps ${logging_steps} \
   --save_steps ${save_steps} \
+  --eval_steps ${eval_steps} \
   --save_total_limit ${save_total_limit} \
   --resume_checkpoint ${resume_checkpoint} \
   --output_dir ${output_dir} \
