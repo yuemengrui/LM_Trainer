@@ -139,7 +139,7 @@ class Trainer:
 
             batch_cost = time.time() - batch_start
 
-            if self.global_step % self.configs['logging_steps'] == 0:
+            if self.global_step > 0 and self.global_step % self.configs['logging_steps'] == 0:
                 logger.info(
                     f" [epoch:{self.current_epoch}/{self.num_epochs}]"
                     f" [step:{self.global_step}/{self.total_steps}]"
@@ -149,10 +149,10 @@ class Trainer:
                     f" speed:{cur_batch_size / batch_cost:.1f}/s"
                     f" [data:{self.data_steps}/{self.train_loader_len} --- {(self.data_steps / self.train_loader_len) + self.current_epoch:.3f} epochs]")
 
-            if self.global_step % self.configs['save_steps'] == 0:
+            if self.global_step > 0 and self.global_step % self.configs['save_steps'] == 0:
                 self._save_checkpoint()
 
-            if self.global_step % self.configs['eval_steps'] == 0:
+            if self.global_step > 0 and self.global_step % self.configs['eval_steps'] == 0:
                 self.do_eval()
 
             batch_start = time.time()
