@@ -8,6 +8,7 @@ import torch
 import numpy as np
 from loguru import logger
 from models import build_model
+from parse_args import args_parse
 from torch.utils.data import DataLoader
 from similarity import cos_sim, compute_spearmanr, compute_pearsonr
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
@@ -47,12 +48,12 @@ class Trainer:
         self.eval_data_total = 0
         self.eval_loader_len = 0
 
-        self.output_dir = self.configs.get('output_dir')
+        self.output_dir = self.configs['output_dir']
         os.makedirs(self.output_dir, exist_ok=True)
 
         self.global_step = 0
         self.start_epoch = 0
-        self.num_epochs = self.configs.get('num_epochs')
+        self.num_epochs = self.configs['num_epochs']
 
         self._initialize()
         self.device = self.model.device
@@ -125,8 +126,12 @@ class Trainer:
 
             batch_cost = time.time() - batch_start
 
-            logger.info(
-                f"[epoch:{epoch}/{self.num_epochs}] [step:{self.global_step}/{self.total_steps}] loss:{current_loss:.6f} lr:{lr:.9f} batch_cost:{batch_cost:.2f}s, speed:{cur_batch_size / batch_cost:.1f}/s")
+            if self.global_step % self.configs['logging_steps'] == 0:
+                logger.info(
+                    f"[epoch:{epoch}/{self.num_epochs}] [step:{self.global_step}/{self.total_steps}] loss:{current_loss:.6f} lr:{lr:.9f} batch_cost:{batch_cost:.2f}s, speed:{cur_batch_size / batch_cost:.1f}/s")
+
+            if self.global_step % self.configs['save_steps'] == 0:
+                self._save_checkpoint(epoch, self.global_step)
 
             batch_start = time.time()
 
@@ -293,7 +298,8 @@ class Trainer:
                                                          num_warmup_steps=warmup_steps,
                                                          num_training_steps=self.total_steps)
 
-        if self.configs.get("resume_checkpoint", None):
+        resume_checkpoint = self.configs.get("resume_checkpoint")
+        if os.path.exists(resume_checkpoint):
             self._load_checkpoint(self.configs["resume_checkpoint"])
 
         logger.info("***** Running training *****")
@@ -304,18 +310,5 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    configs = {
-        "llm_model_name_or_path": "/Users/yuemengrui/Data/LLM/ChatGLM-6B/V2",
-        "device": "mps",
-        "dataset_dir": "./data",
-        "output_dir": "./output",
-        "max_seq_len": 512,
-        "num_epochs": 2,
-        "batch_size": 2,
-        "lr": 2e-5,
-        "warmup_ratio": 0.05,
-        "resume_checkpoint": None
-    }
-
-    trainer = Trainer(configs)
+    trainer = Trainer(vars(args_parse()))
     trainer.train()
