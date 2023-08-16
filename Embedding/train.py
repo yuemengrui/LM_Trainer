@@ -59,8 +59,6 @@ class Trainer:
         self.num_epochs = self.configs['num_epochs']
 
         self._initialize()
-        self.device = self.model.device
-        logger.info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
 
         self.metrics = {
             "best_model_step": 0,
@@ -270,7 +268,7 @@ class Trainer:
             data = json.load(f)
 
         self.global_step = data["global_step"]
-        self.start_epoch = data['epoch']
+        self.start_epoch = data['epoch'] + 1
 
         if 'metrics' in data:
             self.metrics = data['metrics']
@@ -288,6 +286,8 @@ class Trainer:
     def _initialize(self):
 
         self.model = build_model(**self.configs)
+        self.device = self.model.device
+        logger.info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
 
         t = time.time()
         logger.info(f"****** Dataset Information ******")
