@@ -16,6 +16,7 @@ def args_parse():
     parser.add_argument('--warmup_ratio', default=0.05, type=float)
     parser.add_argument('--logging_steps', default=1000, type=int)
     parser.add_argument('--save_steps', default=2000, type=int)
+    parser.add_argument('--save_total_limit', default=1, type=int)
     parser.add_argument('--resume_checkpoint', type=str)
     args = parser.parse_args()
     return args

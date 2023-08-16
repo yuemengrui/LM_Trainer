@@ -5,7 +5,9 @@ import math
 import json
 import time
 import torch
+import shutil
 import numpy as np
+from pathlib import Path
 from loguru import logger
 from models import build_model
 from parse_args import args_parse
@@ -199,18 +201,38 @@ class Trainer:
     def _on_train_finish(self):
         logger.info('train finished!!!')
 
-    def _save_checkpoint(self, epoch, step, best=False):
-        """
-        Saving checkpoints
+    def _sorted_checkpoints(self, checkpoint_prefix='epoch'):
+        ordering_and_checkpoint_path = []
 
-        :param epoch: current epoch number
-        :param log: logging information of the epoch
-        :param save_best: if True, rename the saved checkpoint to 'model_best_old.pth.tar'
-        """
+        glob_checkpoints = [str(x) for x in Path(self.output_dir).glob(f"{checkpoint_prefix}-*") if os.path.isdir(x)]
+
+        for path in glob_checkpoints:
+            ordering_and_checkpoint_path.append((os.path.getmtime(path), path))
+
+        checkpoints_sorted = sorted(ordering_and_checkpoint_path)
+        checkpoints_sorted = [checkpoint[1] for checkpoint in checkpoints_sorted]
+        return checkpoints_sorted
+
+    def _rotate_checkpoints(self):
+        checkpoints_sorted = self._sorted_checkpoints()
+        if len(checkpoints_sorted) <= self.configs['save_total_limit']:
+            return
+
+        number_of_checkpoints_to_delete = max(0, len(checkpoints_sorted) - self.configs['save_total_limit'] + 1)
+        checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
+        for checkpoint in checkpoints_to_be_deleted:
+            logger.info(
+                f"Deleting older checkpoint [{checkpoint}] due to save_total_limit:{self.configs['save_total_limit']}")
+            shutil.rmtree(checkpoint, ignore_errors=True)
+
+        return
+
+    def _save_checkpoint(self, epoch, step, best=False):
         if best:
             save_dir = os.path.join(self.output_dir, "best")
         else:
             save_dir = os.path.join(self.output_dir, f"epoch-{epoch}-step-{step}")
+            self._rotate_checkpoints()
 
         os.makedirs(save_dir, exist_ok=True)
         self.model.save_adapter_model(save_dir)
