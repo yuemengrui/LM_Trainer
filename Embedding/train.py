@@ -137,23 +137,23 @@ class Trainer:
                 self.global_step += 1
                 self.data_steps = data_steps + 1
 
-            batch_cost = time.time() - batch_start
+                batch_cost = time.time() - batch_start
 
-            if self.global_step > 0 and self.global_step % self.configs['logging_steps'] == 0:
-                logger.info(
-                    f" [epoch:{self.current_epoch}/{self.num_epochs}]"
-                    f" [step:{self.global_step}/{self.total_steps}]"
-                    f" loss:{current_loss:.6f}"
-                    f" lr:{lr:.9f}"
-                    f" batch_cost:{batch_cost:.2f}s"
-                    f" speed:{cur_batch_size / batch_cost:.1f}/s"
-                    f" [data:{self.data_steps}/{self.train_loader_len} --- {(self.data_steps / self.train_loader_len) + self.current_epoch:.3f} epochs]")
+                if self.global_step % self.configs['logging_steps'] == 0:
+                    logger.info(
+                        f" [epoch:{self.current_epoch}/{self.num_epochs}]"
+                        f" [step:{self.global_step}/{self.total_steps}]"
+                        f" loss:{current_loss:.6f}"
+                        f" lr:{lr:.9f}"
+                        f" batch_cost:{batch_cost:.2f}s"
+                        f" speed:{cur_batch_size / batch_cost:.1f}/s"
+                        f" [data:{self.data_steps}/{self.train_loader_len} - {(self.data_steps / self.train_loader_len) + self.current_epoch:.2f} epochs]")
 
-            if self.global_step > 0 and self.global_step % self.configs['save_steps'] == 0:
-                self._save_checkpoint()
+                if self.global_step % self.configs['save_steps'] == 0:
+                    self._save_checkpoint()
 
-            if self.global_step > 0 and self.global_step % self.configs['eval_steps'] == 0:
-                self.do_eval()
+                if self.global_step % self.configs['eval_steps'] == 0:
+                    self.do_eval()
 
             batch_start = time.time()
 
@@ -336,7 +336,7 @@ class Trainer:
 
         logger.info(f" train data total:{self.train_data_total}")
         logger.info(f" eval data total:{self.eval_data_total}")
-        logger.info(f" time cost: {time.time() - t}")
+        logger.info(f" time cost: {time.time() - t}s")
         logger.info(f"****** Dataset Information ******")
 
         self.optimizer = AdamW(params=self.model.embedding_layer.parameters(), lr=self.configs.get('lr'),
