@@ -108,7 +108,9 @@ class Trainer:
         self.model.train()
 
         batch_start = time.time()
-        for data_steps, (inputs, labels) in enumerate(self.train_loader[self.data_steps:]):
+        for data_steps, (inputs, labels) in enumerate(self.train_loader):
+            if data_steps <= self.data_steps:
+                continue
             self.data_steps = data_steps + 1
             self.global_step += 1
             lr = self.optimizer.param_groups[0]['lr']
@@ -140,7 +142,7 @@ class Trainer:
                     f" lr:{lr:.9f}"
                     f" batch_cost:{batch_cost:.2f}s"
                     f" speed:{cur_batch_size / batch_cost:.1f}/s"
-                    f" [data:{self.data_steps}/{self.train_loader_len} {(self.data_steps / self.train_loader_len) + self.current_epoch:.3f}epoch]")
+                    f" [data:{self.data_steps}/{self.train_loader_len} --- {(self.data_steps / self.train_loader_len) + self.current_epoch:.3f} epochs]")
 
             if self.global_step % self.configs['save_steps'] == 0:
                 self._save_checkpoint()
@@ -249,10 +251,13 @@ class Trainer:
         logger.info(f" saving model epoch:{self.current_epoch} step:{self.global_step}")
         os.makedirs(save_dir, exist_ok=True)
         self.model.save_adapter_model(save_dir)
-        state = {
+        states = {
+            'batch_size': self.configs['batch_size'],
             'epoch': self.current_epoch,
             'global_step': self.global_step,
             'data_steps': self.data_steps,
+            'train_data_total': self.train_data_total,
+            'train_loader_len': self.train_loader_len,
             'configs': self.configs,
             'metrics': self.metrics
         }
@@ -260,7 +265,7 @@ class Trainer:
         torch.save(self.optimizer.state_dict(), os.path.join(save_dir, "optimizer.bin"))
         torch.save(self.scheduler.state_dict(), os.path.join(save_dir, "scheduler.bin"))
         with open(os.path.join(save_dir, "info.json"), 'w') as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
+            json.dump(states, f, ensure_ascii=False, indent=2)
 
     def _load_checkpoint(self, checkpoint_dir):
         """
@@ -275,14 +280,15 @@ class Trainer:
         self.scheduler.load_state_dict(torch.load(os.path.join(checkpoint_dir, "scheduler.bin")))
 
         with open(os.path.join(checkpoint_dir, "info.json"), 'r') as f:
-            data = json.load(f)
+            states = json.load(f)
 
-        self.global_step = data["global_step"]
-        self.start_epoch = data['epoch']
-        self.data_steps = data['data_steps']
+        self.global_step = states["global_step"]
+        self.start_epoch = states['epoch']
+        if states['train_data_total'] == self.train_data_total and states[
+            'train_loader_len'] == self.train_loader_len and states['batch_size'] == self.configs['batch_size']:
+            self.data_steps = states['data_steps']
 
-        if 'metrics' in data:
-            self.metrics = data['metrics']
+        self.metrics = states['metrics']
 
         for state in self.optimizer.state.values():
             for k, v in state.items():
