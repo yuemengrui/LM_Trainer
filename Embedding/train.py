@@ -57,6 +57,7 @@ class Trainer:
         self.current_epoch = 0
         self.start_epoch = 0
         self.num_epochs = self.configs['num_epochs']
+        self.data_steps = 0
 
         self._initialize()
 
@@ -107,7 +108,8 @@ class Trainer:
         self.model.train()
 
         batch_start = time.time()
-        for step, (inputs, labels) in enumerate(self.train_loader):
+        for data_steps, (inputs, labels) in enumerate(self.train_loader[self.data_steps:]):
+            self.data_steps = data_steps + 1
             self.global_step += 1
             lr = self.optimizer.param_groups[0]['lr']
 
@@ -132,7 +134,13 @@ class Trainer:
 
             if self.global_step % self.configs['logging_steps'] == 0:
                 logger.info(
-                    f"[epoch:{self.current_epoch}/{self.num_epochs}] [step:{self.global_step}/{self.total_steps}] loss:{current_loss:.6f} lr:{lr:.9f} batch_cost:{batch_cost:.2f}s, speed:{cur_batch_size / batch_cost:.1f}/s")
+                    f" [epoch:{self.current_epoch}/{self.num_epochs}]"
+                    f" [step:{self.global_step}/{self.total_steps}]"
+                    f" loss:{current_loss:.6f}"
+                    f" lr:{lr:.9f}"
+                    f" batch_cost:{batch_cost:.2f}s"
+                    f" speed:{cur_batch_size / batch_cost:.1f}/s"
+                    f" [data:{self.data_steps}/{self.train_loader_len} {(self.data_steps / self.train_loader_len) + self.current_epoch:.3f}epoch]")
 
             if self.global_step % self.configs['save_steps'] == 0:
                 self._save_checkpoint()
@@ -200,6 +208,7 @@ class Trainer:
     def _on_epoch_finish(self, epoch_cost):
         logger.info(f" epoch:{self.current_epoch} finished. epoch_cost:{epoch_cost:.2f}s\n")
         self.do_eval()
+        self.data_steps = 0
 
     def _on_train_finish(self, training_cost):
         logger.info(f'****** train finished!!! training_cost: {training_cost} ******')
@@ -243,6 +252,7 @@ class Trainer:
         state = {
             'epoch': self.current_epoch,
             'global_step': self.global_step,
+            'data_steps': self.data_steps,
             'configs': self.configs,
             'metrics': self.metrics
         }
@@ -268,7 +278,8 @@ class Trainer:
             data = json.load(f)
 
         self.global_step = data["global_step"]
-        self.start_epoch = data['epoch'] + 1
+        self.start_epoch = data['epoch']
+        self.data_steps = data['data_steps']
 
         if 'metrics' in data:
             self.metrics = data['metrics']
