@@ -46,7 +46,7 @@ def load_cosent_train_data(dataset_dir):
                         data.append((line[0], score))
                         data.append((line[1], score))
 
-            logger.info(f"load train file: {fil}\n")
+            logger.info(f"load train file: {fil}")
     return data
 
 
@@ -101,7 +101,7 @@ def load_text_matching_test_data(dataset_dir):
                             continue
                         score = int(line[2])
                         data.append((line[0], line[1], score))
-            logger.info(f"load eval file: {fil}\n")
+            logger.info(f"load eval file: {fil}")
     return data
 
 

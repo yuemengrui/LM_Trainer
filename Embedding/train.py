@@ -7,6 +7,7 @@ import time
 import torch
 import shutil
 import numpy as np
+import torch.nn as nn
 from pathlib import Path
 from loguru import logger
 from models import build_model
@@ -95,6 +96,7 @@ class Trainer:
         Full training logic
         """
         training_start = time.time()
+        self.model.zero_grad()
         for epoch in range(self.start_epoch, self.num_epochs):
             self.current_epoch = epoch
             start = time.time()
@@ -111,8 +113,7 @@ class Trainer:
         for data_steps, (inputs, labels) in enumerate(self.train_loader):
             if data_steps <= self.data_steps:
                 continue
-            self.data_steps = data_steps + 1
-            self.global_step += 1
+
             lr = self.optimizer.param_groups[0]['lr']
 
             for k, v in inputs.items():
@@ -126,11 +127,15 @@ class Trainer:
             loss = self.calc_loss(labels, output_embeddings)
 
             current_loss = loss.item()
-
+            if self.configs['gradient_accumulation_steps'] > 1:
+                loss = loss / self.configs['gradient_accumulation_steps']
             loss.backward()
-            self.optimizer.step()
-            self.scheduler.step()
-            self.optimizer.zero_grad()
+            if (data_steps + 1) % self.configs['gradient_accumulation_steps'] == 0:
+                self.optimizer.step()
+                self.scheduler.step()
+                self.optimizer.zero_grad()
+                self.global_step += 1
+                self.data_steps = data_steps + 1
 
             batch_cost = time.time() - batch_start
 
@@ -295,7 +300,9 @@ class Trainer:
                 if isinstance(v, torch.Tensor):
                     state[k] = v.to(self.device)
 
-        logger.info(f" resume from checkpoint (epoch {self.start_epoch})")
+        logger.info(f" Continuing training from epoch {self.start_epoch}")
+        logger.info(f" Continuing training from global step {self.global_step}")
+        logger.info(f" Will skip the first {self.data_steps} steps in the current epoch")
 
         if self.start_epoch >= self.num_epochs:
             self.num_epochs = self.start_epoch + 5
@@ -303,6 +310,8 @@ class Trainer:
     def _initialize(self):
 
         self.model = build_model(**self.configs)
+        if self.configs['data_parallel']:
+            self.model = nn.DataParallel(self.model)
         self.device = self.model.device
         logger.info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
 
