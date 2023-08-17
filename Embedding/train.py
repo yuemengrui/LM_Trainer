@@ -196,7 +196,7 @@ class Trainer:
         results["eval_spearman"] = spearman
         results["eval_pearson"] = pearson
 
-        logger.info(f"****** eval finished! time_cost: {time.time() - start} results: {results}******")
+        logger.info(f"****** eval finished! time_cost: {time.time() - start:.2f}s results: {results}******")
         return results
 
     def do_eval(self):
@@ -312,7 +312,10 @@ class Trainer:
         self.model = build_model(**self.configs)
         if self.configs['data_parallel']:
             self.model = nn.DataParallel(self.model)
-        self.device = self.model.device
+            self.device = torch.device(self.configs['device'])
+        else:
+            self.device = self.model.device
+
         logger.info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
 
         t = time.time()
