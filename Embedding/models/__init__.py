@@ -1,6 +1,6 @@
 # *_*coding:utf-8 *_*
 # @Author : YueMengRui
-from embedding_model import EmbeddingModel
+from .embedding_model import EmbeddingModel
 
 
 def build_model(**kwargs):
