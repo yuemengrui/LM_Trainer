@@ -61,8 +61,10 @@ class Trainer:
         self.num_epochs = self.configs['num_epochs']
         self.data_steps = 0
 
-        self._initialize()
         self.device = torch.device(self.configs['device'])
+        logger.info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
+
+        self._initialize()
 
         self.metrics = {
             "best_model_step": 0,
@@ -316,8 +318,6 @@ class Trainer:
         self.embedding_model = self.model_cls.embedding_model
         if self.configs['data_parallel']:
             self.embedding_model = nn.DataParallel(self.embedding_model)
-
-        logger.info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
 
         t = time.time()
         logger.info(f"****** Dataset Information ******")
