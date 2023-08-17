@@ -3,7 +3,7 @@
 import torch
 import numpy as np
 from typing import List, Dict, Union, Optional
-from chatglm_embedding_model import ChatGLMEmbeddingModel
+from .chatglm_embedding_model import ChatGLMEmbeddingModel
 
 
 class EmbeddingModel:
