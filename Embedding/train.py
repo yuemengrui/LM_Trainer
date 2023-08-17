@@ -344,7 +344,8 @@ class Trainer:
         logger.info(f" time cost: {time.time() - t}s")
         logger.info(f"****** Dataset Information ******")
 
-        self.optimizer = AdamW(params=self.model.embedding_layer.parameters(), lr=self.configs.get('lr'),
+        self.optimizer = AdamW(params=filter(lambda p: p.requires_grad, self.model.parameters()),
+                               lr=self.configs.get('lr'),
                                correct_bias=False)
 
         self.total_steps = self.train_loader_len * self.configs['num_epochs']
