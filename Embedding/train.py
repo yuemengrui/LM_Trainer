@@ -151,7 +151,8 @@ class Trainer:
                         f" lr:{lr:.9f}"
                         f" batch_cost:{batch_cost:.2f}s"
                         f" speed:{cur_batch_size / batch_cost:.1f}/s"
-                        f" [data:{self.data_steps}/{self.train_loader_len} - {(self.data_steps / self.train_loader_len) + self.current_epoch:.2f} epochs]")
+                        f" [data:{self.data_steps}/{self.train_loader_len} - {(self.data_steps / self.train_loader_len) + self.current_epoch:.2f} epochs]"
+                        f" etc:{(batch_cost * (self.train_loader_len - data_steps) * (self.num_epochs - self.current_epoch))/60/60:.2f h}")
 
                 if self.global_step % self.configs['save_steps'] == 0:
                     self._save_checkpoint()
