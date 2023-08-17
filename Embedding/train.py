@@ -62,6 +62,7 @@ class Trainer:
         self.data_steps = 0
 
         self._initialize()
+        self.device = torch.device(self.configs['device'])
 
         self.metrics = {
             "best_model_step": 0,
@@ -97,7 +98,7 @@ class Trainer:
         Full training logic
         """
         training_start = time.time()
-        self.model.zero_grad()
+        self.embedding_model.zero_grad()
         for epoch in range(self.start_epoch, self.num_epochs):
             self.current_epoch = epoch
             start = time.time()
@@ -108,7 +109,7 @@ class Trainer:
         self._on_train_finish(time.time() - training_start)
 
     def _train_epoch(self):
-        self.model.train()
+        self.embedding_model.train()
 
         batch_start = time.time()
         for data_steps, (inputs, labels) in enumerate(self.train_loader):
@@ -124,7 +125,7 @@ class Trainer:
 
             cur_batch_size = labels.size()[0]
 
-            output_embeddings = self.model.get_embeddings(inputs)
+            output_embeddings = self.model_cls.get_embeddings(inputs)
             loss = self.calc_loss(labels, output_embeddings)
 
             current_loss = loss.item()
@@ -168,7 +169,7 @@ class Trainer:
         start = time.time()
         results = {}
 
-        self.model.eval()
+        self.embedding_model.eval()
 
         batch_labels = []
         batch_preds = []
@@ -186,8 +187,8 @@ class Trainer:
             batch_labels.extend(labels.cpu().numpy())
 
             with torch.no_grad():
-                source_embeddings = self.model.get_embeddings(source)
-                target_embeddings = self.model.get_embeddings(target)
+                source_embeddings = self.model_cls.get_embeddings(source)
+                target_embeddings = self.model_cls.get_embeddings(target)
                 preds = torch.cosine_similarity(source_embeddings, target_embeddings)
             batch_preds.extend(preds.cpu().numpy())
 
@@ -256,7 +257,7 @@ class Trainer:
 
         logger.info(f" saving model epoch:{self.current_epoch} step:{self.global_step}")
         os.makedirs(save_dir, exist_ok=True)
-        self.model.save_adapter_model(save_dir)
+        self.embedding_model.save_adapter_model(save_dir)
         states = {
             'batch_size': self.configs['batch_size'],
             'epoch': self.current_epoch,
@@ -280,7 +281,7 @@ class Trainer:
         """
         logger.info(f" Loading checkpoint: {checkpoint_dir} ......")
 
-        self.model.load_adapter_model(checkpoint_dir)
+        self.embedding_model.load_adapter_model(checkpoint_dir)
 
         self.optimizer.load_state_dict(torch.load(os.path.join(checkpoint_dir, "optimizer.bin")))
         self.scheduler.load_state_dict(torch.load(os.path.join(checkpoint_dir, "scheduler.bin")))
@@ -310,13 +311,11 @@ class Trainer:
 
     def _initialize(self):
 
-        self.model = build_model(**self.configs)
-        self.tokenizer = deepcopy(self.model.tokenizer)
+        self.model_cls = build_model(**self.configs)
+        self.tokenizer = self.model_cls.tokenizer
+        self.embedding_model = self.model_cls.embedding_model
         if self.configs['data_parallel']:
-            self.model = nn.DataParallel(self.model)
-            self.device = torch.device(self.configs['device'])
-        else:
-            self.device = self.model.device
+            self.embedding_model = nn.DataParallel(self.embedding_model)
 
         logger.info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
 
@@ -344,7 +343,7 @@ class Trainer:
         logger.info(f" time cost: {time.time() - t}s")
         logger.info(f"****** Dataset Information ******")
 
-        self.optimizer = AdamW(params=filter(lambda p: p.requires_grad, self.model.parameters()),
+        self.optimizer = AdamW(params=filter(lambda p: p.requires_grad, self.embedding_model.parameters()),
                                lr=self.configs.get('lr'),
                                correct_bias=False)
 

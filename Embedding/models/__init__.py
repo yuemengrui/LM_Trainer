@@ -1,7 +1,7 @@
 # *_*coding:utf-8 *_*
 # @Author : YueMengRui
-from .chatglm_embedding_model import ChatGLMEmbeddingModel
+from embedding_model import EmbeddingModel
 
 
 def build_model(**kwargs):
-    return ChatGLMEmbeddingModel(**kwargs)
+    return EmbeddingModel(**kwargs)
