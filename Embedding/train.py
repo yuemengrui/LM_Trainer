@@ -10,6 +10,7 @@ import numpy as np
 import torch.nn as nn
 from pathlib import Path
 from loguru import logger
+from copy import deepcopy
 from models import build_model
 from parse_args import args_parse
 from torch.utils.data import DataLoader
@@ -310,6 +311,7 @@ class Trainer:
     def _initialize(self):
 
         self.model = build_model(**self.configs)
+        self.tokenizer = deepcopy(self.model.tokenizer)
         if self.configs['data_parallel']:
             self.model = nn.DataParallel(self.model)
             self.device = torch.device(self.configs['device'])
@@ -320,10 +322,10 @@ class Trainer:
 
         t = time.time()
         logger.info(f"****** Dataset Information ******")
-        train_dataset = CosentTrainDataset(self.model.tokenizer,
+        train_dataset = CosentTrainDataset(self.tokenizer,
                                            load_cosent_train_data(self.configs['dataset_dir']),
                                            self.configs['max_seq_len'])
-        eval_dataset = TextMatchingTestDataset(self.model.tokenizer,
+        eval_dataset = TextMatchingTestDataset(self.tokenizer,
                                                load_text_matching_test_data(self.configs['dataset_dir']),
                                                self.configs['max_seq_len'])
 
