@@ -155,7 +155,7 @@ class Trainer:
                         f" batch_cost:{batch_cost:.2f}s"
                         f" speed:{cur_batch_size / batch_cost:.1f}/s"
                         f" [data:{self.data_steps}/{self.train_loader_len} - {(self.data_steps / self.train_loader_len) + self.current_epoch:.2f} epochs]"
-                        f" etc:{etc:.2f h}")
+                        f" etc:{etc:.2f}h")
 
                 if self.global_step % self.configs['save_steps'] == 0:
                     self._save_checkpoint()
