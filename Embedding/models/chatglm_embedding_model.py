@@ -508,15 +508,17 @@ class GLMBlock(nn.Module):
 
 class ChatGLMEmbeddingModel(nn.Module):
 
-    def __init__(self, llm_model_name_or_path: str, adapter_path=None, device='cuda', **kwargs):
+    def __init__(self, llm_model_name_or_path: str, adapter_path=None, with_embedding_layer=True, device='cuda',
+                 **kwargs):
         super().__init__()
 
         self.chatglm, self.tokenizer = self._load_model(llm_model_name_or_path, device)
         self.set_requires_grad_to_false()
-
-        self.embedding_layer = GLMBlock(self.chatglm.config, 1, device=torch.device(device))
-        if adapter_path:
-            self.load_adapter_model(adapter_path)
+        self.embedding_layer = None
+        if with_embedding_layer:
+            self.embedding_layer = GLMBlock(self.chatglm.config, 1, device=torch.device(device))
+            if adapter_path:
+                self.load_adapter_model(adapter_path)
 
     def get_embedding_dim(self):
         return self.chatglm.config.hidden_size
@@ -527,8 +529,9 @@ class ChatGLMEmbeddingModel(nn.Module):
     def forward(self, inputs):
         model_output = self.chatglm(**inputs, output_hidden_states=True)
         hidden_states = model_output.hidden_states[-1]  # [Seq_len, Batch, hidden_size]
-        output, _ = self.embedding_layer(hidden_states)
-        output = output.transpose(0, 1)  # [Batch, Seq_len, hidden_size]
+        if self.embedding_layer:
+            hidden_states, _ = self.embedding_layer(hidden_states)
+        output = hidden_states.transpose(0, 1)  # [Batch, Seq_len, hidden_size]
 
         return output
 
