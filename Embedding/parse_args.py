@@ -20,6 +20,7 @@ def args_parse():
     parser.add_argument('--save_steps', default=1000, type=int)
     parser.add_argument('--save_total_limit', default=1, type=int)
     parser.add_argument('--data_parallel', action="store_true")
+    parser.add_argument('--just_init_weight', action="store_true")
     parser.add_argument('--resume_checkpoint', type=str)
     args = parser.parse_args()
     return args

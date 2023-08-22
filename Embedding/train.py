@@ -287,33 +287,36 @@ class Trainer:
         """
         logger.info(f" Loading checkpoint: {checkpoint_dir} ......")
 
+        just_init_weight = self.configs.get("just_init_weight", False)
+
         self.embedding_model.load_adapter_model(checkpoint_dir)
 
-        self.optimizer.load_state_dict(torch.load(os.path.join(checkpoint_dir, "optimizer.bin")))
-        self.scheduler.load_state_dict(torch.load(os.path.join(checkpoint_dir, "scheduler.bin")))
+        if not just_init_weight:
+            self.optimizer.load_state_dict(torch.load(os.path.join(checkpoint_dir, "optimizer.bin")))
+            self.scheduler.load_state_dict(torch.load(os.path.join(checkpoint_dir, "scheduler.bin")))
 
-        with open(os.path.join(checkpoint_dir, "info.json"), 'r') as f:
-            states = json.load(f)
+            with open(os.path.join(checkpoint_dir, "info.json"), 'r') as f:
+                states = json.load(f)
 
-        self.global_step = states["global_step"]
-        self.start_epoch = states['epoch']
-        if states['train_data_total'] == self.train_data_total and states[
-            'train_loader_len'] == self.train_loader_len and states['batch_size'] == self.configs['batch_size']:
-            self.data_steps = states['data_steps']
+            self.global_step = states["global_step"]
+            self.start_epoch = states['epoch']
+            if states['train_data_total'] == self.train_data_total and states[
+                'train_loader_len'] == self.train_loader_len and states['batch_size'] == self.configs['batch_size']:
+                self.data_steps = states['data_steps']
 
-        self.metrics = states['metrics']
+            self.metrics = states['metrics']
 
-        for state in self.optimizer.state.values():
-            for k, v in state.items():
-                if isinstance(v, torch.Tensor):
-                    state[k] = v.to(self.device)
+            for state in self.optimizer.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(self.device)
 
-        logger.info(f" Continuing training from epoch {self.start_epoch}")
-        logger.info(f" Continuing training from global step {self.global_step}")
-        logger.info(f" Will skip the first {self.data_steps} steps in the current epoch")
+            logger.info(f" Continuing training from epoch {self.start_epoch}")
+            logger.info(f" Continuing training from global step {self.global_step}")
+            logger.info(f" Will skip the first {self.data_steps} steps in the current epoch")
 
-        if self.start_epoch >= self.num_epochs:
-            self.num_epochs = self.start_epoch + 5
+            if self.start_epoch >= self.num_epochs:
+                self.num_epochs = self.start_epoch + 5
 
     def _initialize(self):
 
