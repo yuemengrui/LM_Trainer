@@ -1,8 +1,8 @@
 from pathlib import Path
-from ..models import build_model
+from models import build_model
 import typer
 from mteb import MTEB, AbsTask
-from .tasks import (
+from mteb_zh.tasks import (
     GubaEastmony,
     IFlyTek,
     JDIphone,
