@@ -115,7 +115,7 @@ class Trainer:
 
         batch_start = time.time()
         for data_steps, (inputs, labels) in enumerate(self.train_loader):
-            if data_steps <= self.data_steps:
+            if data_steps + 1 < self.data_steps:
                 continue
 
             lr = self.optimizer.param_groups[0]['lr']
@@ -226,7 +226,7 @@ class Trainer:
         self.data_steps = 0
 
     def _on_train_finish(self, training_cost):
-        logger.info(f'****** train finished!!! training_cost: {training_cost} ******')
+        logger.info(f'****** train finished!!! training_cost: {training_cost/60/60:.2f}h ******')
 
     def _sorted_checkpoints(self, checkpoint_prefix='epoch'):
         ordering_and_checkpoint_path = []
@@ -338,7 +338,7 @@ class Trainer:
         self.train_data_total = len(train_dataset)
         self.eval_data_total = len(eval_dataset)
 
-        self.train_loader = DataLoader(train_dataset, batch_size=self.configs.get('batch_size'), shuffle=True,
+        self.train_loader = DataLoader(train_dataset, batch_size=self.configs.get('batch_size'), shuffle=False,
                                        drop_last=True)
         self.train_loader_len = len(self.train_loader)
 
