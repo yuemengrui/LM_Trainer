@@ -162,6 +162,7 @@ class Trainer:
 
                 if self.global_step % self.configs['eval_steps'] == 0:
                     self.do_eval()
+                    self.embedding_model.train()
 
             batch_start = time.time()
 
