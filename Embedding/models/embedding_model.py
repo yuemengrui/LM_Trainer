@@ -27,7 +27,8 @@ class EmbeddingModel:
             sentences: Union[str, List[str]],
             batch_size: int = 64,
             convert_to_numpy: bool = True,
-            convert_to_tensor: bool = False
+            convert_to_tensor: bool = False,
+            **kwargs
     ):
         """
         Returns the embeddings for a batch of sentences.
