@@ -7,7 +7,8 @@ from transformers.activations import ACT2FN
 
 
 class MLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, hidden_act: str = 'silu', pretraining_tp: int = 2):
+    def __init__(self, hidden_size: int, intermediate_size: int, hidden_act: str = 'silu', pretraining_tp: int = 2,
+                 **kwargs):
         super().__init__()
         self.pretraining_tp = pretraining_tp
         self.hidden_size = hidden_size
