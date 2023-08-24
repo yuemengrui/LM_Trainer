@@ -3,6 +3,7 @@
 import os
 import math
 import torch
+from loguru import logger
 import numpy as np
 import torch.nn as nn
 import torch.utils.checkpoint
@@ -592,6 +593,9 @@ class ChatGLMEmbeddingModel(nn.Module):
                  device='cuda', **kwargs):
         super().__init__()
 
+        logger.info(
+            {'llm_model_name_or_path': llm_model_name_or_path, 'adapter_path': adapter_path, 'num_layers': num_layers,
+             'with_embedding_layer': with_embedding_layer, 'device': device})
         self.device = torch.device(device)
         self.chatglm, self.tokenizer = self._load_model(llm_model_name_or_path, device)
         self.set_requires_grad_to_false()
