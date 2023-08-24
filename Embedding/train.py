@@ -350,7 +350,7 @@ class Trainer:
         self.train_loader = DataLoader(train_dataset, batch_size=self.configs.get('batch_size'))
         self.train_loader_len = len(self.train_loader)
 
-        self.eval_loader = DataLoader(eval_dataset, batch_size=1)
+        self.eval_loader = DataLoader(eval_dataset, batch_size=self.configs.get('batch_size'))
         self.eval_loader_len = len(self.eval_loader)
 
         logger.info(f" train data total:{self.train_data_total}")
