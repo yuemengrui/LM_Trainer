@@ -5,6 +5,7 @@ import math
 import torch
 import numpy as np
 import torch.nn as nn
+import torch.utils.checkpoint
 import torch.nn.functional as F
 from typing import List, Dict, Union, Optional
 from transformers import AutoTokenizer, AutoModel
@@ -506,17 +507,97 @@ class GLMBlock(nn.Module):
         return output, kv_cache
 
 
+class GLMTransformer(torch.nn.Module):
+    """Transformer class."""
+
+    def __init__(self, config, num_layers=1, device=None):
+        super(GLMTransformer, self).__init__()
+
+        self.fp32_residual_connection = config.fp32_residual_connection
+        self.post_layer_norm = config.post_layer_norm
+
+        # Number of layers.
+        self.num_layers = num_layers
+
+        # Transformer layers.
+        def build_layer(layer_number):
+            return GLMBlock(config, layer_number, device=device)
+
+        self.layers = torch.nn.ModuleList([build_layer(i + 1) for i in range(self.num_layers)])
+
+        if self.post_layer_norm:
+            LayerNormFunc = RMSNorm
+            # Final layer norm before output.
+            self.final_layernorm = LayerNormFunc(config.hidden_size, eps=config.layernorm_epsilon, device=device,
+                                                 dtype=config.torch_dtype)
+
+        self.gradient_checkpointing = False
+
+    def _get_layer(self, layer_number):
+        return self.layers[layer_number]
+
+    def forward(
+            self, hidden_states, attention_mask, rotary_pos_emb, kv_caches=None,
+            use_cache: Optional[bool] = True,
+            output_hidden_states: Optional[bool] = False,
+    ):
+        if not kv_caches:
+            kv_caches = [None for _ in range(self.num_layers)]
+        presents = () if use_cache else None
+        if self.gradient_checkpointing and self.training:
+            if use_cache:
+                use_cache = False
+
+        all_self_attentions = None
+        all_hidden_states = () if output_hidden_states else None
+        for index in range(self.num_layers):
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (hidden_states,)
+
+            layer = self._get_layer(index)
+            if self.gradient_checkpointing and self.training:
+                layer_ret = torch.utils.checkpoint.checkpoint(
+                    layer,
+                    hidden_states,
+                    attention_mask,
+                    rotary_pos_emb,
+                    kv_caches[index],
+                    use_cache
+                )
+            else:
+                layer_ret = layer(
+                    hidden_states,
+                    attention_mask,
+                    rotary_pos_emb,
+                    kv_cache=kv_caches[index],
+                    use_cache=use_cache
+                )
+            hidden_states, kv_cache = layer_ret
+            if use_cache:
+                presents = presents + (kv_cache,)
+
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        # Final layer norm.
+        if self.post_layer_norm:
+            hidden_states = self.final_layernorm(hidden_states)
+
+        return hidden_states, presents, all_hidden_states, all_self_attentions
+
+
 class ChatGLMEmbeddingModel(nn.Module):
 
-    def __init__(self, llm_model_name_or_path: str, adapter_path=None, with_embedding_layer=True, device='cuda',
-                 **kwargs):
+    def __init__(self, llm_model_name_or_path: str, adapter_path=None, num_layers=1, with_embedding_layer=True,
+                 device='cuda', **kwargs):
         super().__init__()
 
+        self.device = torch.device(device)
         self.chatglm, self.tokenizer = self._load_model(llm_model_name_or_path, device)
         self.set_requires_grad_to_false()
         self.embedding_layer = None
         if with_embedding_layer:
-            self.embedding_layer = GLMBlock(self.chatglm.config, 1, device=torch.device(device))
+            self.embedding_layer = GLMTransformer(self.chatglm.config, num_layers, device=self.device)
             if adapter_path:
                 self.load_adapter_model(adapter_path)
 
@@ -530,7 +611,7 @@ class ChatGLMEmbeddingModel(nn.Module):
         model_output = self.chatglm(**inputs, output_hidden_states=True)
         hidden_states = model_output.hidden_states[-1]  # [Seq_len, Batch, hidden_size]
         if self.embedding_layer:
-            hidden_states, _ = self.embedding_layer(hidden_states)
+            hidden_states, _, _, _ = self.embedding_layer(hidden_states)
         output = hidden_states.transpose(0, 1)  # [Batch, Seq_len, hidden_size]
 
         return output

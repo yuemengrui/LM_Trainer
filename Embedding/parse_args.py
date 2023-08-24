@@ -7,6 +7,7 @@ def args_parse():
     parser = argparse.ArgumentParser('LLM based Embedding')
     parser.add_argument('--llm_model_name_or_path', type=str, required=True)
     parser.add_argument('--device', type=str, default='cuda')
+    parser.add_argument('--num_layers', type=int, default=1)
     parser.add_argument('--dataset_dir', type=str, required=True)
     parser.add_argument('--output_dir', default='./output', type=str)
     parser.add_argument('--log_dir', default='./logs', type=str)
