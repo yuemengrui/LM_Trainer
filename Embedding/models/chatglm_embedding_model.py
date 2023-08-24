@@ -538,7 +538,7 @@ class GLMTransformer(torch.nn.Module):
         return self.layers[layer_number]
 
     def forward(
-            self, hidden_states, attention_mask, rotary_pos_emb, kv_caches=None,
+            self, hidden_states, attention_mask=None, rotary_pos_emb=None, kv_caches=None,
             use_cache: Optional[bool] = True,
             output_hidden_states: Optional[bool] = False,
     ):
