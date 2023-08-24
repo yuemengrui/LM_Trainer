@@ -84,12 +84,9 @@ class ChatGLMEmbeddingModel(nn.Module):
     def forward(self, inputs):
         model_output = self.chatglm(**inputs, output_hidden_states=True)
         hidden_states = model_output.hidden_states[-1]  # [Seq_len, Batch, hidden_size]
-        print(hidden_states.shape)
         if self.embedding_layer:
             hidden_states = self.embedding_layer(hidden_states)  # # [Seq_len, Batch, hidden_size]
-            print(hidden_states.shape)
         output = hidden_states.transpose(0, 1)  # [Batch, Seq_len, hidden_size]
-        print(output.shape)
 
         return output
 
