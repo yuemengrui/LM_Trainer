@@ -14,6 +14,7 @@ from copy import deepcopy
 from models import build_model
 from parse_args import args_parse
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from similarity import cos_sim, compute_spearmanr, compute_pearsonr
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 from dataset import CosentTrainDataset, load_cosent_train_data, TextMatchingTestDataset, load_text_matching_test_data
@@ -54,6 +55,9 @@ class Trainer:
 
         self.output_dir = self.configs['output_dir']
         os.makedirs(self.output_dir, exist_ok=True)
+
+        os.makedirs(self.configs['log_dir'], exist_ok=True)
+        self.summary_writer = SummaryWriter(self.configs['log_dir'])
 
         self.global_step = 0
         self.current_epoch = 0
@@ -150,12 +154,15 @@ class Trainer:
                     logger.info(
                         f" [epoch:{self.current_epoch}/{self.num_epochs}]"
                         f" [step:{self.global_step}/{self.total_steps}]"
-                        f" loss:{current_loss:.6f}"
+                        f" loss:{current_loss}"
                         f" lr:{lr:.9f}"
                         f" batch_cost:{batch_cost:.2f}s"
                         f" speed:{cur_batch_size / batch_cost:.1f}/s"
                         f" [data:{self.data_steps}/{self.train_loader_len} - {(self.data_steps / self.train_loader_len) + self.current_epoch:.2f} epochs]"
                         f" ETA:{eta:.2f}h")
+
+                    self.summary_writer.add_scalar("Loss/train", current_loss, self.global_step)
+                    self.summary_writer.add_scalar("LR", lr, self.global_step)
 
                 if self.global_step % self.configs['save_steps'] == 0:
                     self._save_checkpoint()
@@ -202,6 +209,7 @@ class Trainer:
         spearman = compute_spearmanr(batch_labels, batch_preds)
         pearson = compute_pearsonr(batch_labels, batch_preds)
 
+        self.summary_writer.add_scalars("Acc", {"spearman": spearman, "pearson": pearson}, self.global_step)
         results["eval_spearman"] = spearman
         results["eval_pearson"] = pearson
 
@@ -227,7 +235,7 @@ class Trainer:
         self.data_steps = 0
 
     def _on_train_finish(self, training_cost):
-        logger.info(f'****** train finished!!! training_cost: {training_cost/60/60:.2f}h ******')
+        logger.info(f'****** train finished!!! training_cost: {training_cost / 60 / 60:.2f}h ******')
 
     def _sorted_checkpoints(self, checkpoint_prefix='epoch'):
         ordering_and_checkpoint_path = []

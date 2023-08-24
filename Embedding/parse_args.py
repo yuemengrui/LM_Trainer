@@ -9,6 +9,7 @@ def args_parse():
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--dataset_dir', type=str, required=True)
     parser.add_argument('--output_dir', default='./output', type=str)
+    parser.add_argument('--log_dir', default='./logs', type=str)
     parser.add_argument("--max_seq_len", type=int, default=512, help="text max token len")
     parser.add_argument("--num_epochs", type=int, default=5)
     parser.add_argument('--batch_size', type=int, default=8)

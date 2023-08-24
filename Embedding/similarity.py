@@ -109,7 +109,7 @@ def semantic_search(query_embeddings: Tensor,
                     query_id = query_start_idx + query_itr
                     queries_result_list[query_id].append({'corpus_id': corpus_id, 'score': score})
 
-    # Sort and strip to top_k results
+    # Sort and strip to top_k v1
     for idx in range(len(queries_result_list)):
         queries_result_list[idx] = sorted(queries_result_list[idx], key=lambda x: x['score'], reverse=True)
         queries_result_list[idx] = queries_result_list[idx][0:top_k]
