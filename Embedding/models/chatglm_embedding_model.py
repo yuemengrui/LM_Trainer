@@ -71,7 +71,7 @@ class ChatGLMEmbeddingModel(nn.Module):
                                                          hidden_size=self.chatglm.config.hidden_size,
                                                          intermediate_size=11008,
                                                          **kwargs)
-            self.embedding_layer.to(self.device)
+            self.embedding_layer.half().to(self.device)
             if adapter_path:
                 self.load_adapter_model(adapter_path)
 
