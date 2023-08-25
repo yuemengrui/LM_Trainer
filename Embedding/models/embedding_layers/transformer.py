@@ -16,7 +16,8 @@ class TransformerLayer(nn.Module):
                  norm_first: bool = True,
                  dim_feedforward=None,
                  device=None,
-                 dtype=None):
+                 dtype=None,
+                 **kwargs):
         factory_kwargs = {'device': device, 'dtype': dtype}
         super().__init__()
 

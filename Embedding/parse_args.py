@@ -5,6 +5,7 @@ import argparse
 
 def args_parse():
     parser = argparse.ArgumentParser('LLM based Embedding')
+    parser.add_argument('--llm_type', type=str, choices=['ChatGLM', 'Baichuan'])
     parser.add_argument('--llm_model_name_or_path', type=str, required=True)
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--layer_type', type=str, default='Transformer', choices=['Transformer', 'MLP'])

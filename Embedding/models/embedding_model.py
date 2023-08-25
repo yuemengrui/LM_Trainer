@@ -4,13 +4,21 @@ import torch
 import numpy as np
 from typing import List, Dict, Union, Optional
 from .chatglm_embedding_model import ChatGLMEmbeddingModel
+from .baichuan_embedding_model import BaichuanEmbeddingModel
 
 
 class EmbeddingModel:
-    def __init__(self, max_seq_len: int = 512, device: str = "cuda", **kwargs):
+    def __init__(self, llm_type, max_seq_len: int = 512, device: str = "cuda", **kwargs):
         self.max_seq_len = max_seq_len
         self.device = torch.device(device)
-        self.embedding_model = ChatGLMEmbeddingModel(**kwargs)
+
+        if llm_type == 'ChatGLM':
+            self.embedding_model = ChatGLMEmbeddingModel(**kwargs)
+        elif llm_type == 'Baichuan':
+            self.embedding_model = BaichuanEmbeddingModel(**kwargs)
+        else:
+            raise f"Not supported llm: {llm_type}"
+
         self.tokenizer = self.embedding_model.get_tokenizer()
 
     def get_embeddings(self, inputs):
