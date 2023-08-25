@@ -7,12 +7,12 @@ from transformers.activations import ACT2FN
 
 
 class MLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, hidden_act: str = 'silu', pretraining_tp: int = 2,
+    def __init__(self, d_model: int, dim_feedforward: int, hidden_act: str = 'silu', pretraining_tp: int = 2,
                  **kwargs):
         super().__init__()
         self.pretraining_tp = pretraining_tp
-        self.hidden_size = hidden_size
-        self.intermediate_size = intermediate_size
+        self.hidden_size = d_model
+        self.intermediate_size = dim_feedforward
         self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
         self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)

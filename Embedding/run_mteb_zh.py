@@ -1,19 +1,20 @@
+# *_*coding:utf-8 *_*
+# @Author : YueMengRui
 import csv
 
 csv.field_size_limit(100000000)
 import os
+import json
 from loguru import logger
 from pathlib import Path
 from models import build_model
 import typer
 from mteb import MTEB, AbsTask
-from mteb_zh.tasks import (
+from Embedding.mteb.mteb_zh.tasks import (
     GubaEastmony,
     IFlyTek,
     JDIphone,
-    MedQQPairs,
     StockComSentiment,
-    T2RReranking,
     T2RRetrieval,
     TaskType,
     TNews,
@@ -48,25 +49,43 @@ def main(
         task_type: TaskType = TaskType.All,
         task_name: str | None = None,
         output_folder: Path = Path('results'),
+        adapter_path=""
 ):
     output_folder = Path(output_folder)
-    model = build_model(llm_model_name_or_path="", adapter_path="", with_embedding_layer=True)
+    os.makedirs(output_folder, exist_ok=True)
+
+    with open(os.path.join(adapter_path, 'info.json'), 'r') as f:
+        data = json.load(f)
+
+    configs = data['configs']
+
+    model = build_model(with_embedding_layer=True,
+                        adapter_path=adapter_path,
+                        **configs)
 
     if task_name:
         tasks = filter_by_name(task_name)
     else:
         tasks = filter_by_type(task_type)
 
-    evaluation = MTEB(tasks=tasks)
+    logger.info({'len': len(tasks), 'tasks': tasks})
+
     while True:
-        results_files = os.listdir(output_folder)
-        logger.info({'results_files': results_files})
-        if len(results_files) >= len(tasks):
+        result_files = os.listdir(output_folder)
+        logger.info({'len': len(result_files), 'result_files': result_files})
+        if len(result_files) >= len(tasks):
             break
-        try:
-            evaluation.run(model, output_folder=str(output_folder), batch_size=4)
-        except Exception as e:
-            logger.info(e)
+
+        for task in tasks:
+            evaluation = MTEB(tasks=[task])
+
+            try:
+                evaluation.run(model, output_folder=str(output_folder), batch_size=64)
+            except Exception as e:
+                logger.error(e)
+                continue
+
+    logger.info('eval done!!!')
 
 
 if __name__ == '__main__':

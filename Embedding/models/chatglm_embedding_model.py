@@ -1,14 +1,11 @@
 # *_*coding:utf-8 *_*
 # @Author : YueMengRui
 import os
-import math
 import torch
-from loguru import logger
-import numpy as np
 import torch.nn as nn
+from loguru import logger
 import torch.utils.checkpoint
-import torch.nn.functional as F
-from typing import List, Dict, Union, Optional
+from typing import Dict, Optional
 from transformers import AutoTokenizer, AutoModel
 from .embedding_layers import build_embedding_layer
 
@@ -60,16 +57,18 @@ class ChatGLMEmbeddingModel(nn.Module):
         super().__init__()
 
         logger.info(
-            {'llm_model_name_or_path': llm_model_name_or_path, 'adapter_path': adapter_path, 'layer_type': layer_type,
-             'with_embedding_layer': with_embedding_layer, 'device': device})
+            str({'llm_model_name_or_path': llm_model_name_or_path, 'adapter_path': adapter_path,
+                 'layer_type': layer_type, 'with_embedding_layer': with_embedding_layer,
+                 'device': device}) + str(kwargs))
         self.device = torch.device(device)
         self.chatglm, self.tokenizer = self._load_model(llm_model_name_or_path, device)
         self.set_requires_grad_to_false()
         self.embedding_layer = None
         if with_embedding_layer:
             self.embedding_layer = build_embedding_layer(layer_type=layer_type,
-                                                         hidden_size=self.chatglm.config.hidden_size,
-                                                         intermediate_size=11008,
+                                                         d_model=self.chatglm.config.hidden_size,
+                                                         nhead=self.chatglm.config.num_attention_heads,
+                                                         dim_feedforward=11008,
                                                          **kwargs)
             self.embedding_layer.half().to(self.device)
             if adapter_path:
@@ -84,9 +83,9 @@ class ChatGLMEmbeddingModel(nn.Module):
     def forward(self, inputs):
         model_output = self.chatglm(**inputs, output_hidden_states=True)
         hidden_states = model_output.hidden_states[-1]  # [Seq_len, Batch, hidden_size]
-        if self.embedding_layer:
-            hidden_states = self.embedding_layer(hidden_states)  # # [Seq_len, Batch, hidden_size]
         output = hidden_states.transpose(0, 1)  # [Batch, Seq_len, hidden_size]
+        if self.embedding_layer:
+            output = self.embedding_layer(output)
 
         return output
 
