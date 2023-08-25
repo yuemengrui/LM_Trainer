@@ -8,6 +8,7 @@ import torch.utils.checkpoint
 from typing import Dict, Optional
 from transformers import AutoTokenizer, AutoModel
 from .embedding_layers import build_embedding_layer
+from .base_model import BaseModel
 
 
 def auto_configure_device_map(num_gpus: int) -> Dict[str, int]:
@@ -50,54 +51,39 @@ def auto_configure_device_map(num_gpus: int) -> Dict[str, int]:
     return device_map
 
 
-class ChatGLMEmbeddingModel(nn.Module):
+class ChatGLMEmbeddingModel(nn.Module, BaseModel):
 
     def __init__(self, llm_model_name_or_path: str, adapter_path=None, with_embedding_layer=True,
-                 device='cuda', layer_type='MLP', **kwargs):
+                 device='cuda', layer_type='Transformer', **kwargs):
         super().__init__()
 
         logger.info(
             str({'llm_model_name_or_path': llm_model_name_or_path, 'adapter_path': adapter_path,
                  'layer_type': layer_type, 'with_embedding_layer': with_embedding_layer,
                  'device': device}) + str(kwargs))
+
         self.device = torch.device(device)
-        self.chatglm, self.tokenizer = self._load_model(llm_model_name_or_path, device)
+        self.llm, self.tokenizer = self._load_model(llm_model_name_or_path, device)
         self.set_requires_grad_to_false()
+
         self.embedding_layer = None
         if with_embedding_layer:
             self.embedding_layer = build_embedding_layer(layer_type=layer_type,
-                                                         d_model=self.chatglm.config.hidden_size,
-                                                         nhead=self.chatglm.config.num_attention_heads,
-                                                         dim_feedforward=11008,
+                                                         d_model=self.llm.config.hidden_size,
+                                                         nhead=self.llm.config.num_attention_heads,
                                                          **kwargs)
             self.embedding_layer.half().to(self.device)
             if adapter_path:
                 self.load_adapter_model(adapter_path)
 
-    def get_embedding_dim(self):
-        return self.chatglm.config.hidden_size
-
-    def get_tokenizer(self):
-        return self.tokenizer
-
     def forward(self, inputs):
-        model_output = self.chatglm(**inputs, output_hidden_states=True)
+        model_output = self.llm(**inputs, output_hidden_states=True)
         hidden_states = model_output.hidden_states[-1]  # [Seq_len, Batch, hidden_size]
         output = hidden_states.transpose(0, 1)  # [Batch, Seq_len, hidden_size]
         if self.embedding_layer:
             output = self.embedding_layer(output)
 
         return output
-
-    def save_adapter_model(self, output_dir):
-        torch.save(self.embedding_layer.state_dict(), os.path.join(output_dir, "chatglm_embedding_adapter.pth"))
-
-    def load_adapter_model(self, save_dir):
-        self.embedding_layer.load_state_dict(torch.load(os.path.join(save_dir, "chatglm_embedding_adapter.pth")))
-
-    def set_requires_grad_to_false(self):
-        for name, param in self.chatglm.named_parameters():
-            param.requires_grad = False
 
     def _load_model(self,
                     model_name_or_path,
